@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+  <meta charset="UTF-8">
+  <title>Tetris PWA</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <!-- PWA Manifest -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#121212">
+
+  <style>
+    html, body {
+      margin: 0; padding: 0;
+      background: #121212; color: #fff;
+      font-family: sans-serif;
+      height: 100%; overflow: hidden;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: flex-start;
+      touch-action: none; user-select: none;
+    }
+    canvas {
+      margin-top: 2rem;
+      background: #1e1e1e;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.6);
+    }
+  </style>
+</head>
+<body>
+  <canvas id="tetris" width="240" height="400"></canvas>
+
+  <script>
+    // —––––––––––––––––––––––––––––––––––––––––––––––––––––––––
+    // celý Tetris kód bez skóre (upraveno pro přehlednost)
+    const canvas = document.getElementById('tetris');
+    const ctx = canvas.getContext('2d');
+    ctx.scale(20,20);
+
+    function createMatrix(w,h){
+      const m=[]; while(h--) m.push(new Array(w).fill(0));
+      return m;
+    }
+    function createPiece(t){
+      switch(t){
+        case 'T': return [[0,1,0],[1,1,1],[0,0,0]];
+        case 'O': return [[2,2],[2,2]];
+        case 'L': return [[0,3,0],[0,3,0],[0,3,3]];
+        case 'J': return [[0,4,0],[0,4,0],[4,4,0]];
+        case 'I': return [[0,5,0,0],[0,5,0,0],[0,5,0,0],[0,5,0,0]];
+        case 'S': return [[0,6,6],[6,6,0],[0,0,0]];
+        case 'Z': return [[7,7,0],[0,7,7],[0,0,0]];
+      }
+    }
+    function collide(arena,pl){
+      const m=pl.matrix, o=pl.pos;
+      for(let y=0;y<m.length;++y){
+        for(let x=0;x<m[y].length;++x){
+          if(m[y][x]!==0 && (arena[y+o.y] && arena[y+o.y][x+o.x])!==0){
+            return true;
+          }
+        }
+      }
+      return false;
+    }
+    function merge(arena,pl){
+      pl.matrix.forEach((row,y)=>row.forEach((v,x)=>{
+        if(v!==0) arena[y+pl.pos.y][x+pl.pos.x]=v;
+      }));
+    }
+    function rotate(m,dir){
+      for(let y=0;y<m.length;++y){
+        for(let x=0;x<y;++x){
+          [m[x][y],m[y][x]]=[m[y][x],m[x][y]];
+        }
+      }
+      dir>0?m.forEach(r=>r.reverse()):m.reverse();
+    }
+    function playerReset(){
+      const pieces='TJLOSZI';
+      player.matrix=createPiece(pieces[Math.floor(pieces.length*Math.random())]);
+      player.pos.y=0;
+      player.pos.x=(arena[0].length/2|0)-(player.matrix[0].length/2|0);
+      if(collide(arena,player)){
+        arena.forEach(row=>row.fill(0));
+      }
+    }
+    function playerDrop(){
+      player.pos.y++;
+      if(collide(arena,player)){
+        player.pos.y--;
+        merge(arena,player);
+        playerReset();
+        arenaSweep();
+      }
+      dropCounter=0;
+    }
+    function playerMove(dir){
+      player.pos.x+=dir;
+      if(collide(arena,player)) player.pos.x-=dir;
+    }
+    function playerRotate(dir){
+      const pos=player.pos.x;
+      let off=1;
+      rotate(player.matrix,dir);
+      while(collide(arena,player)){
+        player.pos.x+=off;
+        off=-(off+(off>0?1:-1));
+        if(off>player.matrix[0].length){
+          rotate(player.matrix,-dir);
+          player.pos.x=pos;
+          return;
+        }
+      }
+    }
+    function arenaSweep(){
+      outer: for(let y=arena.length-1;y>0;--y){
+        for(let x=0;x<arena[y].length;++x){
+          if(arena[y][x]===0) continue outer;
+        }
+        const row=arena.splice(y,1)[0].fill(0);
+        arena.unshift(row);
+        ++y;
+      }
+    }
+    function drawMatrix(m,off){
+      m.forEach((row,y)=>row.forEach((v,x)=>{
+        if(v!==0){
+          ctx.fillStyle=colors[v];
+          ctx.fillRect(x+off.x,y+off.y,1,1);
+        }
+      }));
+    }
+    function draw(){
+      ctx.fillStyle='#111';
+      ctx.fillRect(0,0,canvas.width,canvas.height);
+      drawMatrix(arena,{x:0,y:0});
+      drawMatrix(player.matrix,player.pos);
+    }
+    const colors=[null,'#FF0D72','#0DC2FF','#0DFF72','#F538FF','#FF8E0D','#FFE138','#3877FF'];
+    const arena=createMatrix(12,20);
+    const player={pos:{x:0,y:0},matrix:null};
+    let dropCounter=0, dropInterval=1000, lastTime=0;
+    function update(t=0){
+      const dt=t-lastTime;
+      lastTime=t;
+      dropCounter+=dt;
+      if(dropCounter>dropInterval) playerDrop();
+      draw();
+      requestAnimationFrame(update);
+    }
+    playerReset(); update();
+
+    // dotykové ovládání
+    let sx=null, sy=null;
+    canvas.addEventListener('touchstart',e=>{
+      sx=e.touches[0].clientX; sy=e.touches[0].clientY;
+    });
+    canvas.addEventListener('touchend',e=>{
+      const ex=e.changedTouches[0].clientX, ey=e.changedTouches[0].clientY;
+      const dx=ex-sx, dy=ey-sy;
+      if(Math.abs(dx)>Math.abs(dy)){
+        dx>20?playerMove(1):dx<-20?playerMove(-1):null;
+      } else {
+        dy>20?playerDrop():dy<-20?playerRotate(1):null;
+      }
+    });
+    // –––––––––––––––––––––––––––––––––––––––––––––––––––––––––
+    // Service Worker registrace
+    if('serviceWorker' in navigator){
+      navigator.serviceWorker.register('sw.js')
+        .catch(err=>console.error('SW registration failed:', err));
+    }
+  </script>
+</body>
+</html>
