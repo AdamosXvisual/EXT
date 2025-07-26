@@ -3,26 +3,32 @@
 <head>
   <meta charset="UTF-8">
   <title>Tetris PWA</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <!-- viewport s vypnutým zoomem a scrollováním -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 
   <!-- PWA Manifest -->
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#121212">
 
   <style>
+    /* Základ: žádné scrollování ani „bounce“ */
     html, body {
       margin: 0; padding: 0;
-      background: #121212; color: #fff;
-      font-family: sans-serif;
-      height: 100vh; width: 100vw;
+      width: 100vw; height: 100vh;
       overflow: hidden;
+      touch-action: none;
+      overscroll-behavior: none;
+      background: #121212;
+      color: #fff;
+      font-family: sans-serif;
       position: relative;
-      /* iPhone notch support */
+      /* pro iPhone notch */
       padding-top: env(safe-area-inset-top);
       padding-bottom: env(safe-area-inset-bottom);
       padding-left: env(safe-area-inset-left);
       padding-right: env(safe-area-inset-right);
     }
+
     /* Menu tlačítko */
     #menuButton {
       position: absolute;
@@ -53,7 +59,8 @@
       border: none; border-radius: 4px;
       background: #555; color: #fff;
     }
-    /* Kontejner pro hru a skóre */
+
+    /* Hra a skóre */
     #gameContainer {
       position: absolute;
       top: 0; left: 0;
@@ -63,16 +70,14 @@
       align-items: center;
       justify-content: center;
     }
-    /* Responsive canvas */
     canvas {
       width: 100vw;
       height: auto;
-      max-height: calc(100vh - 3.5rem); /* ponechá prostor pro skóre */
+      max-height: calc(100vh - 3.5rem);
       background: #1e1e1e;
       border-radius: 12px;
       box-shadow: 0 4px 12px rgba(0,0,0,0.6);
     }
-    /* Skóre dole */
     #score {
       position: absolute;
       bottom: 10px;
@@ -82,20 +87,19 @@
   </style>
 </head>
 <body>
-  <!-- Menu -->
   <button id="menuButton">☰</button>
   <div id="menuOverlay">
     <button id="resumeButton">Resume</button>
     <button id="restartButton">Restart</button>
   </div>
 
-  <!-- Hra a skóre -->
   <div id="gameContainer">
     <canvas id="tetris" width="240" height="400"></canvas>
     <div id="score">Skóre: 0</div>
   </div>
 
   <script>
+    // --- Původní Tetris kód (beze změny) ---
     const canvas = document.getElementById('tetris');
     const ctx    = canvas.getContext('2d');
     ctx.scale(20,20);
@@ -217,7 +221,7 @@
 
     playerReset(); update(); updateScore();
 
-    // dotyk
+    // doteky
     let sx, sy;
     canvas.addEventListener('touchstart', e => {
       sx=e.touches[0].clientX; sy=e.touches[0].clientY;
@@ -232,7 +236,7 @@
       }
     });
 
-    // PWA SW
+    // PWA ServiceWorker
     if('serviceWorker' in navigator){
       navigator.serviceWorker.register('sw.js')
         .catch(e=>console.error('SW failed:',e));
